@@ -1,0 +1,285 @@
+
+% 1. BASE DE CONOCIMIENTO (hechos)
+
+vehiculo(sedan).
+vehiculo(suv).
+vehiculo(camion).
+
+sistema(motor).
+sistema(frenos).
+sistema(electrico).
+sistema(suspension).
+sistema(ruedas).
+sistema(refrigeracion).
+
+pertenece(aceite, motor).
+pertenece(filtro_aceite, motor).
+pertenece(filtro_aire, motor).
+pertenece(bujia, motor).
+pertenece(correa_distribucion, motor).
+pertenece(pastilla_freno, frenos).
+pertenece(disco_freno, frenos).
+pertenece(balata_freno, frenos).
+pertenece(liquido_freno, frenos).
+pertenece(bateria, electrico).
+pertenece(amortiguador, suspension).
+pertenece(neumatico, ruedas).
+pertenece(refrigerante, refrigeracion).
+
+cambio_km(aceite, 10000).
+cambio_km(filtro_aceite, 10000).
+cambio_km(filtro_aire, 15000).
+cambio_km(bujia, 30000).
+cambio_km(correa_distribucion, 60000).
+cambio_km(pastilla_freno, 30000).
+cambio_km(disco_freno, 60000).
+cambio_km(balata_freno, 40000).
+cambio_km(liquido_freno, 40000).
+cambio_km(bateria, 50000).
+cambio_km(amortiguador, 80000).
+cambio_km(neumatico, 50000).
+cambio_km(refrigerante, 40000).
+
+necesita(cambio_aceite, aceite).
+necesita(cambio_aceite, filtro_aceite).
+necesita(afinamiento, bujia).
+necesita(afinamiento, filtro_aire).
+necesita(cambio_freno, pastilla_freno).
+necesita(cambio_freno, disco_freno).
+necesita(cambio_freno, balata_freno).
+necesita(cambio_freno, liquido_freno).
+necesita(cambio_correa, correa_distribucion).
+necesita(revision_bateria, bateria).
+necesita(cambio_amortiguador, amortiguador).
+necesita(cambio_neumatico, neumatico).
+necesita(cambio_refrigerante, refrigerante).
+
+para_todos(aceite).
+para_todos(filtro_aceite).
+para_todos(filtro_aire).
+para_todos(correa_distribucion).
+para_todos(liquido_freno).
+para_todos(bateria).
+para_todos(amortiguador).
+para_todos(neumatico).
+para_todos(refrigerante).
+
+compatible(bujia, sedan).
+compatible(bujia, suv).
+compatible(pastilla_freno, sedan).
+compatible(pastilla_freno, suv).
+compatible(disco_freno, sedan).
+compatible(disco_freno, suv).
+compatible(balata_freno, camion).
+
+compatible(R, V) :-
+    para_todos(R),
+    vehiculo(V).
+
+% 2. REGLAS
+
+debe_cambiar(R, Km) :-
+    cambio_km(R, Limite),
+    Km >= Limite.
+
+repuesto_mantencion(M, V, R) :-
+    necesita(M, R),
+    compatible(R, V).
+
+% 3. CHATBOT
+
+chatbot :-
+    writeln('Chatbot de repuestos. Escribe "ayuda" o "salir".'),
+    ciclo.
+
+ciclo :-
+    write('> '),
+    read_line_to_string(user_input, Entrada),
+    procesar(Entrada).
+
+procesar(end_of_file) :-
+    !,
+    writeln('Chao!').
+procesar(Entrada) :-
+    limpiar(Entrada, Texto),
+    (   contiene(Texto, "salir")
+    ->  writeln('Chao!')
+    ;   responder(Texto),
+        ciclo
+    ).
+
+limpiar(Entrada, Texto) :-
+    string_lower(Entrada, Minusculas),
+    string_codes(Minusculas, Codigos),
+    maplist(sin_tilde, Codigos, SinTilde),
+    exclude(=(46), SinTilde, SinPuntos),    % 46 es el punto, asi 12.000 -> 12000
+    string_codes(Texto, SinPuntos).
+
+sin_tilde(225, 97) :- !.    % a con tilde
+sin_tilde(233, 101) :- !.   % e con tilde
+sin_tilde(237, 105) :- !.   % i con tilde
+sin_tilde(243, 111) :- !.   % o con tilde
+sin_tilde(250, 117) :- !.   % u con tilde
+sin_tilde(C, C).
+
+
+contiene(Texto, Frase) :-
+    sub_string(Texto, _, _, _, Frase).
+
+contiene_alguna(Texto, Frases) :-
+    member(F, Frases),
+    contiene(Texto, F),
+    !.
+
+menciona(Texto, Atomo) :-
+    atomic_list_concat(Partes, '_', Atomo),
+    todas_las_partes(Partes, Texto).
+
+todas_las_partes([], _).
+todas_las_partes([P|Resto], Texto) :-
+    contiene(Texto, P),
+    todas_las_partes(Resto, Texto).
+
+buscar_repuesto(Texto, R) :-
+    findall(L-X, (repuesto(X), menciona(Texto, X), atom_length(X, L)), Lista),
+    Lista \= [],
+    max_member(_-R, Lista).
+
+buscar_vehiculo(Texto, V) :-
+    vehiculo(V),
+    contiene(Texto, V),
+    !.
+
+buscar_sistema(Texto, S) :-
+    sistema(S),
+    contiene(Texto, S),
+    !.
+
+buscar_mantencion(Texto, M) :-
+    mantencion(M),
+    menciona(Texto, M),
+    !.
+buscar_numero(Texto, N) :-
+    split_string(Texto, " ", "?!,", Palabras),
+    member(P, Palabras),
+    number_string(N, P),
+    !.
+
+bonito(Atomo, Texto) :-
+    atomic_list_concat(Partes, '_', Atomo),
+    atomic_list_concat(Partes, ' ', Texto).
+
+lista_bonita(Atomos, Texto) :-
+    maplist(bonito, Atomos, Bonitos),
+    atomic_list_concat(Bonitos, ', ', Texto).
+
+% responder(Texto): cada clausula es un tipo de pregunta
+
+responder(Texto) :-
+    buscar_numero(Texto, Km),
+    buscar_repuesto(Texto, R),
+    cambio_km(R, Limite),
+    !,
+    bonito(R, NR),
+    (   debe_cambiar(R, Km)
+    ->  format('Si, cambialo (~w: cada ~w km).~n', [NR, Limite])
+    ;   Faltan is Limite - Km,
+        format('No, faltan ~w km (~w: cada ~w km).~n', [Faltan, NR, Limite])
+    ).
+
+responder(Texto) :-
+    contiene_alguna(Texto, ["cuantos km", "cada cuanto", "kilometros"]),
+    buscar_repuesto(Texto, R),
+    cambio_km(R, Km),
+    !,
+    bonito(R, NR),
+    format('~w: cada ~w km.~n', [NR, Km]).
+
+responder(Texto) :-
+    contiene(Texto, "sistema"),
+    contiene(Texto, "pertenece"),
+    buscar_repuesto(Texto, R),
+    !,
+    pertenece(R, S),
+    bonito(R, NR),
+    format('~w: sistema ~w.~n', [NR, S]).
+
+responder(Texto) :-
+    buscar_mantencion(Texto, M),
+    !,
+    bonito(M, NM),
+    (   buscar_vehiculo(Texto, V)
+    ->  findall(R, repuesto_mantencion(M, V, R), Lista),
+        mostrar_lista(Lista, '~w (~w): ~w.~n', [NM, V],
+                      'Ninguno para ese vehiculo.~n')
+    ;   findall(R, necesita(M, R), Lista),
+        mostrar_lista(Lista, '~w: ~w.~n', [NM],
+                      'Sin repuestos registrados.~n')
+    ).
+
+responder(Texto) :-
+    buscar_repuesto(Texto, R),
+    buscar_vehiculo(Texto, V),
+    !,
+    bonito(R, NR),
+    (   compatible(R, V)
+    ->  format('Si, ~w sirve para ~w.~n', [NR, V])
+    ;   format('No, ~w no sirve para ~w.~n', [NR, V])
+    ).
+
+responder(Texto) :-
+    contiene(Texto, "vehiculo"),
+    buscar_repuesto(Texto, R),
+    !,
+    bonito(R, NR),
+    findall(V, compatible(R, V), Lista),
+    mostrar_lista(Lista, '~w: ~w.~n', [NR],
+                  'Sin vehiculos registrados.~n').
+
+responder(Texto) :-
+    contiene_alguna(Texto, ["repuesto", "sistema"]),
+    buscar_sistema(Texto, S),
+    !,
+    findall(R, pertenece(R, S), Lista),
+    mostrar_lista(Lista, '~w: ~w.~n', [S],
+                  'Sin repuestos registrados.~n').
+
+responder(Texto) :-
+    contiene(Texto, "repuesto"),
+    buscar_vehiculo(Texto, V),
+    !,
+    findall(R, compatible(R, V), Lista),
+    mostrar_lista(Lista, '~w: ~w.~n', [V],
+                  'Sin repuestos registrados.~n').
+
+responder(Texto) :-
+    buscar_repuesto(Texto, R),
+    !,
+    pertenece(R, S),
+    cambio_km(R, Km),
+    bonito(R, NR),
+    format('~w: sistema ~w, cada ~w km.~n', [NR, S, Km]).
+
+responder(Texto) :-
+    contiene_alguna(Texto, ["ayuda", "ejemplo"]),
+    !,
+    writeln('Ejemplos:'),
+    writeln('- Cada cuantos km se cambia el aceite?'),
+    writeln('- Debo cambiar las bujias si tengo 35000 km?'),
+    writeln('- Que repuestos necesita el cambio de aceite?'),
+    writeln('- Sirve la bujia para un camion?'),
+    writeln('- Para que vehiculos sirve el disco de freno?'),
+    writeln('- Que repuestos tiene el sistema de frenos?'),
+    writeln('- Que repuestos sirven para un suv?'),
+    writeln('- A que sistema pertenece la bateria?').
+
+responder(_) :-
+    writeln('No entendi. Escribe "ayuda".').
+
+mostrar_lista([], _, _, MensajeVacio) :-
+    !,
+    format(MensajeVacio, []).
+mostrar_lista(Lista, Mensaje, Datos, _) :-
+    lista_bonita(Lista, Texto),
+    append(Datos, [Texto], Argumentos),
+    format(Mensaje, Argumentos).

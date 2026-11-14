@@ -1,0 +1,45 @@
+CONOCIMIENTO: MANTENCION Y REPUESTOS DE VEHICULOS
+
+Tipos de vehiculo: sedan, suv y camion.
+
+SISTEMAS Y REPUESTOS
+- Sistema motor: aceite, filtro de aceite, filtro de aire, bujia, correa de distribucion.
+- Sistema frenos: pastilla de freno, disco de freno, balata de freno, liquido de freno.
+- Sistema electrico: bateria.
+- Sistema suspension: amortiguador.
+- Sistema ruedas: neumatico.
+- Sistema refrigeracion: refrigerante.
+
+CADA CUANTOS KILOMETROS SE CAMBIA CADA REPUESTO
+- Aceite: cada 10000 km.
+- Filtro de aceite: cada 10000 km.
+- Filtro de aire: cada 15000 km.
+- Bujia: cada 30000 km.
+- Correa de distribucion: cada 60000 km.
+- Pastilla de freno: cada 30000 km.
+- Disco de freno: cada 60000 km.
+- Balata de freno: cada 40000 km.
+- Liquido de freno: cada 40000 km.
+- Bateria: cada 50000 km.
+- Amortiguador: cada 80000 km.
+- Neumatico: cada 50000 km.
+- Refrigerante: cada 40000 km.
+Un repuesto debe cambiarse cuando el vehiculo tiene igual o mas kilometros que ese limite.
+
+COMPATIBILIDAD DE REPUESTOS CON VEHICULOS
+- La bujia sirve para sedan y suv (no para camion).
+- La pastilla de freno sirve para sedan y suv (no para camion).
+- El disco de freno sirve para sedan y suv (no para camion).
+- La balata de freno sirve solo para camion.
+- Sirven para todos los vehiculos (sedan, suv y camion): aceite, filtro de aceite, filtro de aire, correa de distribucion, liquido de freno, bateria, amortiguador, neumatico y refrigerante.
+
+MANTENCIONES Y LOS REPUESTOS QUE NECESITAN
+- Cambio de aceite: aceite y filtro de aceite.
+- Afinamiento: bujia y filtro de aire.
+- Cambio de freno: pastilla de freno, disco de freno, balata de freno y liquido de freno.
+- Cambio de correa: correa de distribucion.
+- Revision de bateria: bateria.
+- Cambio de amortiguador: amortiguador.
+- Cambio de neumatico: neumatico.
+- Cambio de refrigerante: refrigerante.
+Para un vehiculo concreto solo se usan los repuestos compatibles. Por ejemplo, el cambio de freno en sedan o suv usa pastilla de freno, disco de freno y liquido de freno; en camion usa balata de freno y liquido de freno.
