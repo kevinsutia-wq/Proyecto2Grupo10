@@ -134,12 +134,18 @@
       cuadro.value = "";
       const linea = agregar("Pensando...", "respuesta");
 
-      const respuesta = await fetch("/", {
-        method: "POST",
-        body: JSON.stringify({ pregunta: pregunta, modo: modo })
-      });
-      const datos = await respuesta.json();
-      linea.textContent = modo.toUpperCase() + ": " + datos.respuesta;
+      // si el servidor no responde se avisa
+      try {
+        const respuesta = await fetch("/", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ pregunta: pregunta, modo: modo })
+        });
+        const datos = await respuesta.json();
+        linea.textContent = modo.toUpperCase() + ": " + datos.respuesta;
+      } catch (error) {
+        linea.textContent = "Error: no se pudo conectar con el servidor.";
+      }
     }
 
     // poner un ejemplo en el cuadro de texto

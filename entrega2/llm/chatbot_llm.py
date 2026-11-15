@@ -3,6 +3,7 @@
 
 import json
 import os
+import urllib.error
 import urllib.request
 
 # datos del llm que usamos
@@ -16,10 +17,13 @@ ARCHIVO = os.path.join(CARPETA, "..", "conocimiento.txt")
 
 
 def responder(pregunta):
-    # leer el conocimiento
-    archivo = open(ARCHIVO, encoding="utf-8")
-    conocimiento = archivo.read()
-    archivo.close()
+    # sin clave el llm no responde
+    if CLAVE == "":
+        return "Error: falta la clave del LLM, hay que hacer source clave.sh antes."
+
+    # leer el conocimiento (with cierra el archivo solo)
+    with open(ARCHIVO, encoding="utf-8") as archivo:
+        conocimiento = archivo.read()
 
     # instrucciones para el llm
     instrucciones = (
@@ -51,6 +55,9 @@ def responder(pregunta):
         respuesta = urllib.request.urlopen(peticion, timeout=60)
         resultado = json.loads(respuesta.read().decode("utf-8"))
         return resultado["choices"][0]["message"]["content"].strip()
+    except urllib.error.HTTPError as error:
+        # el codigo dice que paso, por ejemplo 429 es que hicimos muchas peticiones
+        return "Error del LLM, codigo " + str(error.code) + ": " + str(error.reason)
     except Exception as error:
         return "Error al llamar al LLM: " + str(error)
 
@@ -59,7 +66,10 @@ def responder(pregunta):
 if __name__ == "__main__":
     print('Chatbot LLM. Escribe "salir" para terminar.')
     while True:
-        texto = input("> ")
+        try:
+            texto = input("> ")
+        except EOFError:  # si se aprieta ctrl+d
+            break
         if texto.strip().lower() == "salir":
             break
         print(responder(texto))

@@ -22,4 +22,8 @@ Si solo se quiere probar Prolog en la terminal, se usa este comando y se escribe
 
 swipl -s prolog/chatbot.pl -g chatbot
 
+Para revisar que el chatbot en Prolog sigue respondiendo bien estan las pruebas en prolog/pruebas.pl. Cada prueba muestra OK o FALLA. Se ejecutan con:
+
+swipl -g probar -t halt prolog/pruebas.pl
+
 Si se quiere cambiar el conocimiento, en Prolog se editan los hechos que estan al comienzo de chatbot.pl, y para el LLM se editan las frases de conocimiento.txt. Hay que cambiar los dos para que las dos versiones sepan lo mismo.

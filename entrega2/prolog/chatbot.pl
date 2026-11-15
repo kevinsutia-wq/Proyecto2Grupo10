@@ -89,7 +89,23 @@ repuesto_mantencion(M, V, R) :-
     necesita(M, R),
     compatible(R, V).
 
+% un repuesto se cambia en un vehiculo solo si ese repuesto sirve para el vehiculo
+debe_cambiar_en(R, V, Km) :-
+    compatible(R, V),
+    debe_cambiar(R, Km).
+
 % parte tres chatbot que conversa
+
+% palabras cortas que la gente usa para nombrar un repuesto
+alias(correa, correa_distribucion).
+alias(pastilla, pastilla_freno).
+alias(disco, disco_freno).
+alias(balata, balata_freno).
+alias(llanta, neumatico).
+alias(anticongelante, refrigerante).
+
+% palabras que pueden ser mas de un repuesto
+ambiguo(filtro, [filtro_aceite, filtro_aire]).
 
 chatbot :-
     writeln('Chatbot de repuestos. Escribe "ayuda" o "salir".'),
@@ -123,8 +139,11 @@ sin_tilde(233, 101) :- !.   % e con tilde
 sin_tilde(237, 105) :- !.   % i con tilde
 sin_tilde(243, 111) :- !.   % o con tilde
 sin_tilde(250, 117) :- !.   % u con tilde
+sin_tilde(252, 117) :- !.   % u con dieresis
+sin_tilde(241, 110) :- !.   % enie
+sin_tilde(191, 32) :- !.    % signo de pregunta al reves se cambia por espacio
+sin_tilde(161, 32) :- !.    % signo de exclamacion al reves se cambia por espacio
 sin_tilde(C, C).
-
 
 contiene(Texto, Frase) :-
     sub_string(Texto, _, _, _, Frase).
@@ -134,23 +153,60 @@ contiene_alguna(Texto, Frases) :-
     contiene(Texto, F),
     !.
 
+% separar el texto en palabras y quitar las palabras de relleno
+palabras(Texto, Palabras) :-
+    split_string(Texto, " ,;:?!", " ,;:?!", Todas),
+    exclude(sin_valor, Todas, Palabras).
+
+sin_valor("").
+sin_valor("de").
+sin_valor("del").
+sin_valor("el").
+sin_valor("la").
+sin_valor("los").
+sin_valor("las").
+
+% una palabra es igual a una parte del nombre, tambien en plural (bujias = bujia)
+misma_palabra(Palabra, Parte) :-
+    atom_string(Parte, P),
+    (   Palabra == P
+    ;   string_concat(P, "s", Palabra)
+    ;   string_concat(P, "es", Palabra)
+    ),
+    !.
+
+% el texto menciona un atomo si sus partes aparecen seguidas (filtro de aire = filtro_aire)
 menciona(Texto, Atomo) :-
+    palabras(Texto, Palabras),
     atomic_list_concat(Partes, '_', Atomo),
-    todas_las_partes(Partes, Texto).
+    seguidas(Partes, Palabras).
 
-todas_las_partes([], _).
-todas_las_partes([P|Resto], Texto) :-
-    contiene(Texto, P),
-    todas_las_partes(Resto, Texto).
+% las partes estan al comienzo de la lista, o si no se sigue buscando en el resto
+seguidas(Partes, Palabras) :-
+    al_comienzo(Partes, Palabras),
+    !.
+seguidas(Partes, [_|Resto]) :-
+    seguidas(Partes, Resto).
 
+al_comienzo([], _).
+al_comienzo([P|Partes], [W|Palabras]) :-
+    misma_palabra(W, P),
+    al_comienzo(Partes, Palabras).
+
+% se busca el nombre mas largo y si no hay ninguno se busca un alias
 buscar_repuesto(Texto, R) :-
     findall(L-X, (repuesto(X), menciona(Texto, X), atom_length(X, L)), Lista),
     Lista \= [],
+    !,
     max_member(_-R, Lista).
+buscar_repuesto(Texto, R) :-
+    alias(Palabra, R),
+    menciona(Texto, Palabra),
+    !.
 
 buscar_vehiculo(Texto, V) :-
     vehiculo(V),
-    contiene(Texto, V),
+    menciona(Texto, V),
     !.
 
 buscar_sistema(Texto, S) :-
@@ -162,10 +218,15 @@ buscar_mantencion(Texto, M) :-
     mantencion(M),
     menciona(Texto, M),
     !.
+
+% acepta "8000" y tambien "8000km" escrito junto
 buscar_numero(Texto, N) :-
-    split_string(Texto, " ", "?!,", Palabras),
+    palabras(Texto, Palabras),
     member(P, Palabras),
-    number_string(N, P),
+    (   number_string(N, P)
+    ;   string_concat(Numero, "km", P),
+        number_string(N, Numero)
+    ),
     !.
 
 bonito(Atomo, Texto) :-
@@ -177,17 +238,46 @@ lista_bonita(Atomos, Texto) :-
     atomic_list_concat(Bonitos, ', ', Texto).
 
 % cada regla de responder es un tipo de pregunta
+% el orden importa: se usa la primera regla que sirve
 
+% la palabra "filtro" sola no dice cual filtro es
+responder(Texto) :-
+    \+ buscar_repuesto(Texto, _),
+    ambiguo(Palabra, Opciones),
+    menciona(Texto, Palabra),
+    !,
+    lista_bonita(Opciones, NO),
+    format('Hay mas de un ~w: ~w. Cual de ellos?~n', [Palabra, NO]).
+
+% debo cambiar un repuesto con N km (revisa si sirve para el vehiculo)
 responder(Texto) :-
     buscar_numero(Texto, Km),
     buscar_repuesto(Texto, R),
     cambio_km(R, Limite),
     !,
     bonito(R, NR),
-    (   debe_cambiar(R, Km)
+    (   buscar_vehiculo(Texto, V),
+        \+ compatible(R, V)
+    ->  format('No aplica, ~w no sirve para ~w.~n', [NR, V])
+    ;   debe_cambiar(R, Km)
     ->  format('Si, cambialo (~w: cada ~w km).~n', [NR, Limite])
     ;   Faltan is Limite - Km,
         format('No, faltan ~w km (~w: cada ~w km).~n', [Faltan, NR, Limite])
+    ).
+
+% que debo cambiar con N km (sin nombrar un repuesto)
+responder(Texto) :-
+    buscar_numero(Texto, Km),
+    contiene_alguna(Texto, ["km", "kilometro"]),
+    \+ buscar_mantencion(Texto, _),
+    !,
+    (   buscar_vehiculo(Texto, V)
+    ->  findall(R, debe_cambiar_en(R, V, Km), Lista),
+        mostrar_lista(Lista, 'Con ~w km en ~w debes cambiar: ~w.~n', [Km, V],
+                      'Con esos km todavia no toca cambiar nada.~n')
+    ;   findall(R, debe_cambiar(R, Km), Lista),
+        mostrar_lista(Lista, 'Con ~w km debes cambiar: ~w.~n', [Km],
+                      'Con esos km todavia no toca cambiar nada.~n')
     ).
 
 responder(Texto) :-
@@ -219,6 +309,16 @@ responder(Texto) :-
         mostrar_lista(Lista, '~w: ~w.~n', [NM],
                       'Sin repuestos registrados.~n')
     ).
+
+% en que mantenciones se usa un repuesto
+responder(Texto) :-
+    contiene(Texto, "mantencion"),
+    buscar_repuesto(Texto, R),
+    !,
+    bonito(R, NR),
+    findall(M, necesita(M, R), Lista),
+    mostrar_lista(Lista, '~w se usa en: ~w.~n', [NR],
+                  'Ninguna mantencion usa ese repuesto.~n').
 
 responder(Texto) :-
     buscar_repuesto(Texto, R),
@@ -263,13 +363,49 @@ responder(Texto) :-
     bonito(R, NR),
     format('~w: sistema ~w, cada ~w km.~n', [NR, S, Km]).
 
+% preguntas generales, como que vehiculos hay
+responder(Texto) :-
+    contiene(Texto, "todos"),
+    contiene(Texto, "vehiculo"),
+    !,
+    findall(R, para_todos(R), Lista),
+    mostrar_lista(Lista, 'Sirven para todos los vehiculos: ~w.~n', [],
+                  'Sin repuestos registrados.~n').
+
+responder(Texto) :-
+    contiene(Texto, "mantencion"),
+    !,
+    findall(M, mantencion(M), Lista0),
+    sort(Lista0, Lista),
+    mostrar_lista(Lista, 'Mantenciones: ~w.~n', [], 'Sin mantenciones registradas.~n').
+
+responder(Texto) :-
+    contiene(Texto, "sistema"),
+    !,
+    findall(S, sistema(S), Lista),
+    mostrar_lista(Lista, 'Sistemas: ~w.~n', [], 'Sin sistemas registrados.~n').
+
+responder(Texto) :-
+    contiene(Texto, "repuesto"),
+    !,
+    findall(R, repuesto(R), Lista),
+    mostrar_lista(Lista, 'Repuestos: ~w.~n', [], 'Sin repuestos registrados.~n').
+
+responder(Texto) :-
+    contiene(Texto, "vehiculo"),
+    !,
+    findall(V, vehiculo(V), Lista),
+    mostrar_lista(Lista, 'Vehiculos: ~w.~n', [], 'Sin vehiculos registrados.~n').
+
 responder(Texto) :-
     contiene_alguna(Texto, ["ayuda", "ejemplo"]),
     !,
     writeln('Ejemplos:'),
     writeln('- Cada cuantos km se cambia el aceite?'),
     writeln('- Debo cambiar las bujias si tengo 35000 km?'),
+    writeln('- Tengo un sedan con 30000 km, que debo cambiar?'),
     writeln('- Que repuestos necesita el cambio de aceite?'),
+    writeln('- En que mantencion se usa el filtro de aire?'),
     writeln('- Sirve la bujia para un camion?'),
     writeln('- Para que vehiculos sirve el disco de freno?'),
     writeln('- Que repuestos tiene el sistema de frenos?'),

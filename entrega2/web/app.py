@@ -21,6 +21,8 @@ def responder_prolog(pregunta):
         resultado = subprocess.run(comando, capture_output=True, timeout=20)
     except FileNotFoundError:
         return "Error: no esta instalado swipl (SWI-Prolog)."
+    except subprocess.TimeoutExpired:
+        return "Error: Prolog se demoro demasiado."
     texto = resultado.stdout.decode("utf-8", errors="replace").strip()
     return texto or "Prolog no devolvio respuesta."
 
@@ -28,15 +30,25 @@ def responder_prolog(pregunta):
 class Servidor(BaseHTTPRequestHandler):
     # mostrar la pagina cuando el navegador la pide
     def do_GET(self):
-        pagina = open(os.path.join(CARPETA, "index.html"), "rb").read()
+        # solo existe la pagina principal
+        if self.path != "/":
+            self.enviar_json({"respuesta": "Pagina no encontrada."}, 404)
+            return
+        with open(os.path.join(CARPETA, "index.html"), "rb") as archivo:
+            pagina = archivo.read()
         self.enviar("text/html; charset=utf-8", pagina)
 
     # recibir la pregunta del usuario
     def do_POST(self):
-        largo = int(self.headers.get("Content-Length", 0))
-        datos = json.loads(self.rfile.read(largo))
-        pregunta = datos["pregunta"].strip()
-        modo = datos["modo"]
+        # si los datos llegan mal se avisa en vez de caerse
+        try:
+            largo = int(self.headers.get("Content-Length", 0))
+            datos = json.loads(self.rfile.read(largo))
+            pregunta = datos["pregunta"].strip()
+            modo = datos["modo"]
+        except Exception:
+            self.enviar_json({"respuesta": "Error: la pregunta no llego bien."}, 400)
+            return
 
         if pregunta == "":
             respuesta = "Escribe una pregunta."
@@ -45,12 +57,16 @@ class Servidor(BaseHTTPRequestHandler):
         else:
             respuesta = responder_prolog(pregunta)
 
-        cuerpo = json.dumps({"respuesta": respuesta}).encode("utf-8")
-        self.enviar("application/json", cuerpo)
+        self.enviar_json({"respuesta": respuesta})
+
+    # pasar los datos a json y enviarlos
+    def enviar_json(self, datos, codigo=200):
+        cuerpo = json.dumps(datos).encode("utf-8")
+        self.enviar("application/json", cuerpo, codigo)
 
     # enviar la respuesta al navegador
-    def enviar(self, tipo, cuerpo):
-        self.send_response(200)
+    def enviar(self, tipo, cuerpo, codigo=200):
+        self.send_response(codigo)
         self.send_header("Content-Type", tipo)
         self.send_header("Content-Length", str(len(cuerpo)))
         self.end_headers()
@@ -60,4 +76,7 @@ class Servidor(BaseHTTPRequestHandler):
 # arrancar el servidor
 if __name__ == "__main__":
     print("Servidor en http://localhost:8000  (Ctrl+C para detener)")
-    HTTPServer(("localhost", 8000), Servidor).serve_forever()
+    try:
+        HTTPServer(("localhost", 8000), Servidor).serve_forever()
+    except KeyboardInterrupt:
+        print("Servidor detenido.")
